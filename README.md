@@ -11,10 +11,10 @@ observability/scaling.
 .
 ├── backend/                  # Express API + BullMQ worker
 ├── frontend/                 # React (Vite) app
-├── Dockerfile.backend
-├── Dockerfile.frontend
-├── .dockerignore
-├── docker-compose.yml
+├── 
+├── 
+├── 
+├── 
 ├── k8s/                      # Namespaces, Deployments, Services, Ingress
 ├── observability/            # Prometheus, Grafana, Fluent Bit, Loki, HPA
 └── .github/workflows/ci-cd.yml
