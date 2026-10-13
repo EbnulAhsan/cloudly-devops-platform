@@ -44,6 +44,15 @@ spec:
               value: "amqp://rabbitmq-service:5672"
             - name: ELASTICSEARCH_URL
               value: "http://elasticsearch-service:9200"
+          
+          # Added for HPA (Task 6)
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
 
 ---
 apiVersion: v1

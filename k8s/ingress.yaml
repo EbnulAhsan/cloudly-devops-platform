@@ -1,4 +1,3 @@
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -6,6 +5,9 @@ metadata:
   namespace: dev
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
 spec:
   ingressClassName: nginx
   rules:
