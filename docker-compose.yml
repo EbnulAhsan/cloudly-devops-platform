@@ -19,6 +19,21 @@ services:
     ports:
       - "6379:6379"
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: dev-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  elasticsearch:
+    image: elasticsearch:7.17.10
+    container_name: dev-elasticsearch
+    environment:
+      - discovery.type=single-node
+    ports:
+      - "9200:9200"
+
   backend:
     build:
       context: ./backend
@@ -31,13 +46,20 @@ services:
       - DB_USER=devuser
       - DB_PASSWORD=devpassword
       - DB_NAME=appdb
-      - REDIS_URL=redis://redis:6379
       - PORT=4000
+      # Platform Services & DB Simulation
+      - DB_WRITE_URL=postgres://devuser:devpassword@postgres:5432/appdb
+      - DB_READ_URL=postgres://devuser:devpassword@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
       - "4000:4000"
     depends_on:
       - postgres
       - redis
+      - rabbitmq
+      - elasticsearch
 
   frontend:
     build:
