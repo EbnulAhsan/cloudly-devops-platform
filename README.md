@@ -321,7 +321,6 @@ All screenshots (cluster state, Grafana dashboards, application UI, and successf
 | 4 | CI/CD Pipeline | Successful GitHub Actions runs |
 | 5 | Observability | Grafana dashboards and Prometheus targets |
 
-> 🔗 Link: [Open Screenshots Folder](YOUR_GOOGLE_DRIVE_LINK_HERE)
 
 ---
 
