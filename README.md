@@ -306,7 +306,7 @@ Prometheus, Grafana, and Fluent Bit manifests live in the `observability/` folde
 All screenshots (cluster state, Grafana dashboards, application UI, and successful CI/CD runs) are available in the Google Drive folder below.
 
 <p align="center">
-  <a href="YOUR_GOOGLE_DRIVE_LINK_HERE">
+  <a href="https://drive.google.com/drive/folders/1UL0INP-qi_ffSRCqDIHJwzAMq-jo8jVa?usp=sharing">
     <img src="https://img.shields.io/badge/📂_View_Screenshots-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="View Screenshots on Google Drive"/>
   </a>
 </p>
