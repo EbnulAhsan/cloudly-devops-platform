@@ -1,199 +1,722 @@
-# Node + React + Postgres — Production-Style Local Platform
+<div align="center">
 
-A simple full-stack app (React + Node.js/Express + PostgreSQL) taken through
-six stages: containerization, Kubernetes, Ingress/API gateway, CI/CD,
-platform services (Redis/queue/search + simulated read/write DB), and
-observability/scaling.
+# ☁️ Cloudly DevOps Platform 
 
-## Repo structure
+**A production-ready platform built around a React + Node.js + PostgreSQL application**
+using Docker, Kubernetes, CI/CD, and observability tooling.
 
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
+![NGINX](https://img.shields.io/badge/NGINX_Ingress-009639?logo=nginx&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
+
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Prerequisites](#-prerequisites)
+- [Task 1: Local Containerized Setup](#-task-1-local-containerized-setup)
+- [Task 2 & 3: Kubernetes Deployment & Ingress](#-task-2--3-kubernetes-deployment--ingress)
+- [Task 4: CI/CD & Multi-Environment Deployment](#-task-4-cicd--multi-environment-deployment)
+- [Task 5: Platform Services & DB Read/Write Simulation](#-task-5-platform-services--db-readwrite-simulation)
+- [Task 6: Observability, Scaling & Rate Limiting](#-task-6-observability-scaling--rate-limiting)
+- [Screenshots](#-screenshots)
+- [Design Decisions & Trade-offs](#-design-decisions--trade-offs)
+- [Future Improvements](#-future-improvements)
+
+---
+
+## 🔎 Overview
+
+This repository contains the completed hands-on assessment for the **DevOps Engineer** role. It takes a simple React + Node.js + PostgreSQL application and turns it into a production-ready platform with:
+
+- Containerized local development (Docker Compose)
+- Kubernetes deployment with NGINX Ingress
+- Multi-environment CI/CD with GitHub Actions
+- Platform services: Redis, RabbitMQ, Elasticsearch
+- Read/write database cluster simulation
+- Autoscaling, rate limiting, and observability (Prometheus, Grafana, Fluent Bit)
+
+---
+
+## 🏗 Architecture
+
+### High-Level System Architecture
+
+```mermaid
+flowchart LR
+    U([👤 User Browser]) -->|http://node-react.local| ING
+
+    subgraph K8S["☸️ Kubernetes Cluster (namespace: dev / preprod / release)"]
+        ING["NGINX Ingress Controller<br/>(API Gateway + Rate Limiting)"]
+        ING -->|"/"| FES["Frontend Service<br/>(ClusterIP)"]
+        ING -->|"/api"| BES["Backend Service<br/>(ClusterIP)"]
+        FES --> FEP["Frontend Pods<br/>(React)"]
+        BES --> BEP["Backend Pods<br/>(Node.js, HPA 1–5)"]
+
+        BEP --> REDIS[("Redis<br/>Cache")]
+        BEP --> MQ[["RabbitMQ<br/>Async Queue"]]
+        BEP --> ES[("Elasticsearch<br/>Search")]
+        BEP -->|DB_WRITE_URL| PGW[("PostgreSQL<br/>Primary")]
+        BEP -->|DB_READ_URL| PGR[("PostgreSQL<br/>Replica")]
+        PGW -.replication.-> PGR
+    end
+
+    subgraph OBS["📊 Observability"]
+        PROM[Prometheus] --> GRAF[Grafana]
+        FB[Fluent Bit] --> ES
+    end
+
+    BEP -.metrics.-> PROM
+    BEP -.logs.-> FB
 ```
-.
-├── backend/                  # Express API + BullMQ worker
-├── frontend/                 # React (Vite) app
-├── 
-├── 
-├── 
-├── 
-├── k8s/                      # Namespaces, Deployments, Services, Ingress
-├── observability/            # Prometheus, Grafana, Fluent Bit, Loki, HPA
-└── .github/workflows/ci-cd.yml
+
+> 💡 You can also export this diagram as an image and save it to `docs/architecture.png` (see [Screenshots](#-screenshots)).
+
+### Request Path
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant Ingress as NGINX Ingress
+    participant FE as Frontend Service
+    participant BE as Backend Service
+    participant Pod as Backend Pod
+    participant DB as PostgreSQL / Redis
+
+    User->>Ingress: GET http://node-react.local/api/...
+    Ingress->>Ingress: Path-based routing (/ vs /api) + rate limit
+    Ingress->>BE: Forward to backend (ClusterIP)
+    BE->>Pod: Load-balance to healthy pod
+    Pod->>DB: Query (read → replica, write → primary)
+    DB-->>Pod: Result
+    Pod-->>User: JSON response
+    User->>Ingress: GET http://node-react.local/
+    Ingress->>FE: Forward to frontend (ClusterIP)
+    FE-->>User: React static assets
+```
+
+### CI/CD Flow
+
+```mermaid
+flowchart LR
+    DEV([Developer]) -->|git push| GH[GitHub Repository]
+    GH --> GA{{GitHub Actions<br/>ci-cd.yml}}
+    GA --> B[Build Docker Images]
+    B --> P[Push to Docker Hub]
+    P --> D{Branch?}
+    D -->|main| NS1[dev namespace]
+    D -->|pre-release/v*| NS2[preprod namespace]
+    D -->|release/v*| NS3[release namespace]
 ```
 
 ---
 
-## Task 1 — Local Docker Compose
+## 🧰 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React (Vite) |
+| Backend | Node.js |
+| Database | PostgreSQL (primary + replica simulation) |
+| Cache / Queue / Search | Redis, RabbitMQ, Elasticsearch |
+| Containerization | Docker, Docker Compose (multi-stage builds) |
+| Orchestration | Kubernetes (`kind` / `minikube`) |
+| Ingress | NGINX Ingress Controller |
+| CI/CD | GitHub Actions, Docker Hub |
+| Observability | Prometheus, Grafana, Fluent Bit |
+
+---
+
+## ✅ Prerequisites
+
+| Tool | Purpose |
+|---|---|
+| **Docker & Docker Compose** | Local containerized setup |
+| **Kubernetes cluster** (`kind` or `minikube`) | Local orchestration |
+| **kubectl** | CLI to interact with the cluster |
+| **NGINX Ingress Controller** | Installed on the local cluster |
+
+---
+
+## 🐳 Task 1: Local Containerized Setup
+
+Start the entire local environment with a single command:
 
 ```bash
-docker compose up --build
+docker compose up -d
 ```
 
-- Frontend: http://localhost:8080
-- Backend:  http://localhost:4000/api/health
-- Postgres: localhost:5432 (persisted in the `postgres_data` volume)
+This launches the **frontend, backend, PostgreSQL, Redis, RabbitMQ, and Elasticsearch**. Multi-stage Dockerfiles (`Dockerfile.backend`, `Dockerfile.frontend`) keep the images optimized and minimal.
 
-Both Dockerfiles use multi-stage builds (deps/build stage discarded, only
-`node_modules` + source or the compiled static bundle ship in the final
-image). No secrets are hardcoded — DB/Redis/search connection info comes from
-environment variables (see `docker-compose.yml` and `backend/.env.example`).
+---
 
-## Task 2 — Kubernetes
+## ☸️ Task 2 & 3: Kubernetes Deployment & Ingress
 
-Requires a local cluster (`kind` or `minikube`) with images built and loaded
-(or pushed to a registry the cluster can pull from):
+### Deployment
+
+All resources are deployed in the `dev` namespace. Apply the manifests:
 
 ```bash
-kubectl apply -f k8s/namespace-dev.yaml
-kubectl apply -n dev -f k8s/
+kubectl apply -f k8s/
 ```
 
-- `dev` namespace holds everything.
-- `backend-service` / `postgres-service` are `ClusterIP` — internal only.
-- `frontend-service` is `NodePort` (30080) for direct access; Task 3 adds
-  Ingress on top for a friendlier path.
-- Postgres uses a `PersistentVolumeClaim` bound to a `hostPath` PV so data
-  survives pod restarts.
-- `backend` has `readinessProbe`/`livenessProbe` hitting `/api/health/ready`
-  and `/api/health/live` respectively — readiness checks the DB is
-  reachable, liveness only checks the process is up (so a slow DB doesn't
-  cause pointless container restarts).
-
-## Task 3 — Ingress / API Gateway
+Then add the host entry to access the app:
 
 ```bash
-# example for kind: install nginx-ingress, then
 echo "127.0.0.1 node-react.local" | sudo tee -a /etc/hosts
-kubectl apply -n dev -f k8s/ingress-dev.yaml
 ```
 
-**Request path:** `Browser → Ingress → Service → Pod → PostgreSQL`
-1. Browser resolves `node-react.local` to the ingress controller's IP (via
-   `/etc/hosts` locally, or real DNS in prod).
-2. The Ingress controller matches the path: `/api` or `/api/*` →
-   `backend-service`; everything else → `frontend-service`.
-3. The Service load-balances across matching pods via `kube-proxy` (or an
-   eBPF equivalent).
-4. The backend Pod talks to Postgres via `postgres-service`.
+### Internal DNS Resolution
 
-**Kubernetes DNS:** every Service gets a stable DNS name of the form
-`<service>.<namespace>.svc.cluster.local` — e.g. `backend-service.dev.svc.
-cluster.local`. Pods use this name instead of an IP because pod IPs change
-on every restart/reschedule; the Service is the stable, load-balanced front
-door.
+Kubernetes uses **CoreDNS** for internal service discovery. The backend is resolvable inside the cluster via its FQDN:
 
-**Debugging:**
-- *Ingress reachable but backend is not:* check `kubectl get endpoints
-  backend-service -n dev` — empty means the Service's label selector isn't
-  matching any Ready pod. Then check backend pod logs and its readiness
-  probe status.
-- *Frontend can't reach backend:* confirm `VITE_API_BASE_URL` was baked in
-  correctly at build time, that the browser's requests are going to `/api/*`
-  (not `http://backend-service:4000` — that hostname only resolves inside
-  the cluster, not from the browser), and check the Ingress controller logs
-  for a 404/502 on that path.
+```
+backend.dev.svc.cluster.local
+```
 
-**Evolving to microservices:** the Ingress already acts as a lightweight API
-gateway routing by path prefix. Splitting the backend into multiple services
-(e.g. `users-service`, `orders-service`) just means adding more path rules
-(`/api/users`, `/api/orders`, …) pointing at more ClusterIP Services — the
-Ingress, DNS, and probe patterns established here don't change.
+### 🐞 Debugging Scenarios
 
-## Task 4 — CI/CD & Multi-Environment Deployment
+<details>
+<summary><b>Ingress is reachable, but backend is not</b></summary>
 
-`.github/workflows/ci-cd.yml` triggers on push to:
+1. Check that backend pods are running:
+   ```bash
+   kubectl get pods -n dev
+   ```
+2. Check backend pod logs for application crashes:
+   ```bash
+   kubectl logs <backend-pod-name> -n dev
+   ```
+3. Verify the Ingress routing rules match the backend service **name** and **port**.
+4. Confirm the service has endpoints (traffic is reaching pods):
+   ```bash
+   kubectl get endpoints backend -n dev
+   ```
 
-| Branch pattern      | Target namespace |
-|----------------------|-------------------|
-| `master`             | `dev`             |
-| `pre-release/v*`     | `preprod`         |
-| `release/v*`         | `release`         |
+</details>
 
-Pipeline: install deps → build/validate both services → build Docker images
-→ tag as `<branch>-<short-sha>` → push to GHCR → `sed`-patch the k8s
-manifests with the new image tag and target namespace → `kubectl apply`.
+<details>
+<summary><b>Frontend cannot talk to the backend</b></summary>
 
-**Secrets:** the registry push uses the ephemeral, repo-scoped
-`GITHUB_TOKEN` — no long-lived registry credentials are stored. Cluster
-access uses a base64-encoded kubeconfig stored as an encrypted Actions
-secret (`KUBECONFIG_B64`), scoped to a service account limited to the
-target namespace(s).
+1. Verify the `VITE_API_BASE_URL` environment variable in the frontend pod.
+2. Check the browser console / network tab for CORS errors or blocked requests.
+3. Ensure the backend service exposes the correct port and the Ingress properly routes `/api` traffic.
 
-**Rollback:** two options, both included —
-1. **Fast:** `kubectl rollout undo deployment/<name> -n <namespace>` (wired
-   up as a manual `workflow_dispatch` job in the pipeline) — reverts to the
-   previous ReplicaSet immediately.
-2. **Precise:** re-run the pipeline against the previous commit/tag, which
-   rebuilds and redeploys that exact known-good image — slower, but
-   guarantees you're not relying on a ReplicaSet Kubernetes hasn't garbage
-   collected yet.
+</details>
 
-## Task 5 — Platform Services: Redis, Queue, Search, Read/Write DB
+### 🔮 Microservice Evolution
 
-Added to both `docker-compose.yml` and `k8s/`:
-- **Redis** (`redis-deployment.yaml` / `redis-service.yaml`) — the backend
-  connects via `REDIS_URL` (`backend/src/redisClient.js`) and exposes
-  `/api/health/redis`.
-- **Queue** (`bullmq-worker-deployment.yaml`) — BullMQ over Redis. Every
-  `POST /api/items` enqueues an `item-created` job (`backend/src/queue.js`);
-  a separate worker process (`backend/src/worker.js`, same image, different
-  `command:`) consumes it. Decoupling the worker into its own Deployment
-  means it scales and fails independently of the API.
-- **Search** (`search-deployment.yaml` / `search-service.yaml`) — OpenSearch
-  in single-node dev mode. The backend only does a health call today
-  (`backend/src/search.js`, `/api/health/search`) — real indexing would hook
-  into the same queue consumer.
+This Ingress-based design can evolve into a larger microservices architecture. By introducing an **API Gateway** (Kong, Ambassador) or a **service mesh** (Istio), the monolithic backend can be split into smaller services (e.g., `auth-service`, `billing-service`) and routed via dedicated Ingress paths such as `/api/auth` and `/api/billing`.
 
-**Simulated read/write DB cluster:** `backend/src/db.js` holds two separate
-`pg.Pool` instances — `writePool` from `DB_WRITE_URL`, `readPool` from
-`DB_READ_URL`. `write()` (INSERT/UPDATE/DELETE) always uses `writePool`;
-`read()` (SELECT) uses `readPool`. Locally both env vars point at the same
-Postgres instance, but the code already treats them as separate targets, so
-pointing `DB_READ_URL` at a real replica later is a one-line config change —
-no application code changes.
+---
 
-**Where routing logic lives:** in this repo it's explicit in application
-code (`write()` vs `read()` helpers). The alternative is a DB proxy
-(PgBouncer, ProxySQL, or a cloud-managed read/write splitter) that makes
-routing transparent to the app — simpler application code, but another
-component to operate and one more hop of latency.
+## 🚀 Task 4: CI/CD & Multi-Environment Deployment
 
-**Replication lag:** a replica can be milliseconds to seconds behind the
-primary. Anything that reads its own recent write — "did my update save?",
-a redirect-after-POST that re-fetches the record, uniqueness checks before
-an insert — must hit the writer/primary, not a replica, or it risks reading
-stale data and behaving as if the write never happened.
+A GitHub Actions pipeline (`.github/workflows/ci-cd.yml`) automates build and deployment.
 
-## Task 6 — Observability, Scaling & Rate Limiting
+### Branch-to-Environment Mapping
 
-`observability/`:
-- **Prometheus** (`prometheus.yaml`) scrapes any pod annotated
-  `prometheus.io/scrape: "true"` (the backend Deployment is annotated
-  accordingly) in the `dev` namespace.
-- **Grafana** (`grafana.yaml`) for dashboards on: backend CPU usage, backend
-  memory usage, request rate & error rate, and replica count over time.
-- **Fluent Bit** (`fluentbit-daemonset.yaml`) runs as a `DaemonSet` (one per
-  node, so it picks up every pod's logs on that node regardless of which
-  pods get scheduled where) and ships backend logs to **Loki**
-  (`loki.yaml`).
-- **HPA** (`hpa-backend.yaml`) scales the backend Deployment 2→6 replicas on
-  CPU (70%) or memory (80%) utilization.
+| Branch | Target Namespace |
+|---|---|
+| `main` | `dev` |
+| `pre-release/v*` | `preprod` |
+| `release/v*` | `release` |
 
-**What to alert on, and why:**
-- **High error rate** (5xx / total requests) — the most direct signal
-  something is actually broken for users, independent of load level.
-- **High CPU / at max HPA replicas** — means the autoscaler is out of
-  headroom; the next symptom is queueing and latency, not just slow scaling.
-- **High p95/p99 latency** — catches degradation (slow queries, GC pauses,
-  a struggling dependency) that error-rate and CPU alone can miss.
-- **Sustained high request rate** without a matching replica increase —
-  usually indicates the HPA is misconfigured or capped, not that traffic is
-  fine.
+### 🔐 Secrets Handling
 
-**Verifying logs:** `kubectl logs -n dev daemonset/fluent-bit` to confirm
-Fluent Bit is running and tailing files, then query Loki (via Grafana's
-Explore view, `{job="backend"}`) to confirm entries are actually arriving
-and are searchable/filterable by label.
-# node-react-postgres-platform
-# node-react-postgres-platform
-# node-react-postgres-platform
-# node-react-postgres-platform
+Docker Hub credentials (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) are stored as **GitHub Actions Secrets** and injected at runtime. Long-lived credentials are never committed to the repository.
+
+### ⏪ Rollback Strategy
+
+| Method | Command / Action |
+|---|---|
+| **Fast rollback** | `kubectl rollout undo deployment/backend -n <namespace>` — instantly reverts to the previous ReplicaSet |
+| **CI/CD rollback** | Re-run a previous successful workflow, or revert the Git commit and push so the pipeline redeploys the last stable state |
+
+---
+
+## 🗄 Task 5: Platform Services & DB Read/Write Simulation
+
+### Integrated Services
+
+| Service | Role |
+|---|---|
+| **Redis** | Caching layer |
+| **RabbitMQ** | Message queue for asynchronous tasks |
+| **Elasticsearch** | Search engine indexing |
+
+### Read/Write Database Cluster Simulation
+
+The platform simulates a production DB cluster by exposing separate connection settings:
+
+- `DB_WRITE_URL` → **Primary**
+- `DB_READ_URL` → **Replica**
+
+```mermaid
+flowchart LR
+    APP[Backend App] -->|INSERT / UPDATE / DELETE| W[(Primary DB)]
+    APP -->|SELECT| R[(Read Replica)]
+    W -.replication.-> R
+```
+
+**Where routing logic lives:** in production, read/write routing typically sits at the **application ORM layer** (e.g., Prisma/Sequelize with read replicas) or in a **database proxy** (e.g., PgBouncer, AWS RDS Proxy) that transparently sends `SELECT` queries to replicas and writes to the primary.
+
+**Replication lag implications:** replicas can lag behind the primary. Critical *read-after-write* flows (e.g., a user updates their profile and immediately views it) must be routed to the **primary** to avoid showing stale data.
+
+---
+
+## 📈 Task 6: Observability, Scaling & Rate Limiting
+
+### Scaling & Rate Limiting
+
+| Feature | Configuration |
+|---|---|
+| **Horizontal Pod Autoscaler** | Scales backend between **1 and 5 replicas** when CPU utilization exceeds **70%** |
+| **Rate limiting** | NGINX Ingress annotations limit users to **20 requests/second** and **10 concurrent connections** to mitigate DDoS and API abuse |
+
+### Observability Stack
+
+Prometheus, Grafana, and Fluent Bit manifests live in the `observability/` folder.
+
+### 🚨 Key Alerts
+
+| Alert | Threshold | Why it matters |
+|---|---|---|
+| **High error rate** | HTTP 5xx > 5% for 5 min | Indicates backend crashes, misconfiguration, or DB connection loss |
+| **High CPU / memory** | > 85% for 10 min | Abnormal load, scaling need, or memory leak |
+| **High latency** | API response > 2s | Degraded UX; likely slow queries, missing indexes, or a platform-service bottleneck |
+
+---
+
+## 🖼 Screenshots
+
+> Place all images in the `docs/` folder and update the file names below if needed.
+
+### Architecture Diagram
+
+<p align="center">
+  <img src="docs/architecture.png" alt="Architecture Diagram" width="800"/>
+</p>
+
+### Application UI
+
+<p align="center">
+  <img src="docs/app-ui.png" alt="Application UI" width="800"/>
+</p>
+
+### Kubernetes Cluster State
+
+| Pods & Services | Ingress & HPA |
+|:---:|:---:|
+| <img src="docs/k8s-pods.png" alt="kubectl get pods" width="400"/> | <img src="docs/k8s-ingress-hpa.png" alt="Ingress and HPA" width="400"/> |
+
+### CI/CD Pipeline
+
+<p align="center">
+  <img src="docs/cicd-run.png" alt="Successful GitHub Actions run" width="800"/>
+</p>
+
+### Observability
+
+| Grafana Dashboard | Prometheus Targets |
+|:---:|:---:|
+| <img src="docs/grafana-dashboard.png" alt="Grafana Dashboard" width="400"/> | <img src="docs/prometheus-targets.png" alt="Prometheus Targets" width="400"/> |
+
+---
+
+## ⚖️ Design Decisions & Trade-offs
+
+| Decision | Rationale |
+|---|---|
+| **Docker Hub over GHCR** | Simple public image access for local Kubernetes pulls, without configuring `ImagePullSecrets` |
+| **Raw manifests over Helm** | Simplicity and transparency for this assessment. In a real-world setup, Helm charts would template deployments per environment |
+
+---
+
+## 🔭 Future Improvements
+
+- [ ] Provision cloud infrastructure with **Terraform** (Infrastructure as Code)
+- [ ] Adopt **ArgoCD** for GitOps-based continuous deployment instead of pushing directly from GitHub Actions
+- [ ] Add comprehensive **readiness and liveness probes** for platform services (Redis, RabbitMQ)
+
+---
+
+<div align="center">
+
+Built with ❤️ for the Cloudly DevOps Engineer assessment.
+
+</div>
+<div align="center">
+
+# ☁️ Cloudly DevOps Platform Assessment
+
+**A production-ready platform built around a React + Node.js + PostgreSQL application**
+using Docker, Kubernetes, CI/CD, and observability tooling.
+
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
+![NGINX](https://img.shields.io/badge/NGINX_Ingress-009639?logo=nginx&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)
+
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Prerequisites](#-prerequisites)
+- [Task 1: Local Containerized Setup](#-task-1-local-containerized-setup)
+- [Task 2 & 3: Kubernetes Deployment & Ingress](#-task-2--3-kubernetes-deployment--ingress)
+- [Task 4: CI/CD & Multi-Environment Deployment](#-task-4-cicd--multi-environment-deployment)
+- [Task 5: Platform Services & DB Read/Write Simulation](#-task-5-platform-services--db-readwrite-simulation)
+- [Task 6: Observability, Scaling & Rate Limiting](#-task-6-observability-scaling--rate-limiting)
+- [Screenshots](#-screenshots)
+- [Design Decisions & Trade-offs](#-design-decisions--trade-offs)
+- [Future Improvements](#-future-improvements)
+
+---
+
+## 🔎 Overview
+
+This repository contains the completed hands-on assessment for the **DevOps Engineer** role. It takes a simple React + Node.js + PostgreSQL application and turns it into a production-ready platform with:
+
+- Containerized local development (Docker Compose)
+- Kubernetes deployment with NGINX Ingress
+- Multi-environment CI/CD with GitHub Actions
+- Platform services: Redis, RabbitMQ, Elasticsearch
+- Read/write database cluster simulation
+- Autoscaling, rate limiting, and observability (Prometheus, Grafana, Fluent Bit)
+
+---
+
+## 🏗 Architecture
+
+### High-Level System Architecture
+
+```mermaid
+flowchart LR
+    U([👤 User Browser]) -->|http://node-react.local| ING
+
+    subgraph K8S["☸️ Kubernetes Cluster (namespace: dev / preprod / release)"]
+        ING["NGINX Ingress Controller<br/>(API Gateway + Rate Limiting)"]
+        ING -->|"/"| FES["Frontend Service<br/>(ClusterIP)"]
+        ING -->|"/api"| BES["Backend Service<br/>(ClusterIP)"]
+        FES --> FEP["Frontend Pods<br/>(React)"]
+        BES --> BEP["Backend Pods<br/>(Node.js, HPA 1–5)"]
+
+        BEP --> REDIS[("Redis<br/>Cache")]
+        BEP --> MQ[["RabbitMQ<br/>Async Queue"]]
+        BEP --> ES[("Elasticsearch<br/>Search")]
+        BEP -->|DB_WRITE_URL| PGW[("PostgreSQL<br/>Primary")]
+        BEP -->|DB_READ_URL| PGR[("PostgreSQL<br/>Replica")]
+        PGW -.replication.-> PGR
+    end
+
+    subgraph OBS["📊 Observability"]
+        PROM[Prometheus] --> GRAF[Grafana]
+        FB[Fluent Bit] --> ES
+    end
+
+    BEP -.metrics.-> PROM
+    BEP -.logs.-> FB
+```
+
+> 💡 You can also export this diagram as an image and save it to `docs/architecture.png` (see [Screenshots](#-screenshots)).
+
+### Request Path
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant Ingress as NGINX Ingress
+    participant FE as Frontend Service
+    participant BE as Backend Service
+    participant Pod as Backend Pod
+    participant DB as PostgreSQL / Redis
+
+    User->>Ingress: GET http://node-react.local/api/...
+    Ingress->>Ingress: Path-based routing (/ vs /api) + rate limit
+    Ingress->>BE: Forward to backend (ClusterIP)
+    BE->>Pod: Load-balance to healthy pod
+    Pod->>DB: Query (read → replica, write → primary)
+    DB-->>Pod: Result
+    Pod-->>User: JSON response
+    User->>Ingress: GET http://node-react.local/
+    Ingress->>FE: Forward to frontend (ClusterIP)
+    FE-->>User: React static assets
+```
+
+### CI/CD Flow
+
+```mermaid
+flowchart LR
+    DEV([Developer]) -->|git push| GH[GitHub Repository]
+    GH --> GA{{GitHub Actions<br/>ci-cd.yml}}
+    GA --> B[Build Docker Images]
+    B --> P[Push to Docker Hub]
+    P --> D{Branch?}
+    D -->|main| NS1[dev namespace]
+    D -->|pre-release/v*| NS2[preprod namespace]
+    D -->|release/v*| NS3[release namespace]
+```
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React (Vite) |
+| Backend | Node.js |
+| Database | PostgreSQL (primary + replica simulation) |
+| Cache / Queue / Search | Redis, RabbitMQ, Elasticsearch |
+| Containerization | Docker, Docker Compose (multi-stage builds) |
+| Orchestration | Kubernetes (`kind` / `minikube`) |
+| Ingress | NGINX Ingress Controller |
+| CI/CD | GitHub Actions, Docker Hub |
+| Observability | Prometheus, Grafana, Fluent Bit |
+
+---
+
+## ✅ Prerequisites
+
+| Tool | Purpose |
+|---|---|
+| **Docker & Docker Compose** | Local containerized setup |
+| **Kubernetes cluster** (`kind` or `minikube`) | Local orchestration |
+| **kubectl** | CLI to interact with the cluster |
+| **NGINX Ingress Controller** | Installed on the local cluster |
+
+---
+
+## 🐳 Task 1: Local Containerized Setup
+
+Start the entire local environment with a single command:
+
+```bash
+docker compose up -d
+```
+
+This launches the **frontend, backend, PostgreSQL, Redis, RabbitMQ, and Elasticsearch**. Multi-stage Dockerfiles (`Dockerfile.backend`, `Dockerfile.frontend`) keep the images optimized and minimal.
+
+---
+
+## ☸️ Task 2 & 3: Kubernetes Deployment & Ingress
+
+### Deployment
+
+All resources are deployed in the `dev` namespace. Apply the manifests:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Then add the host entry to access the app:
+
+```bash
+echo "127.0.0.1 node-react.local" | sudo tee -a /etc/hosts
+```
+
+### Internal DNS Resolution
+
+Kubernetes uses **CoreDNS** for internal service discovery. The backend is resolvable inside the cluster via its FQDN:
+
+```
+backend.dev.svc.cluster.local
+```
+
+### 🐞 Debugging Scenarios
+
+<details>
+<summary><b>Ingress is reachable, but backend is not</b></summary>
+
+1. Check that backend pods are running:
+   ```bash
+   kubectl get pods -n dev
+   ```
+2. Check backend pod logs for application crashes:
+   ```bash
+   kubectl logs <backend-pod-name> -n dev
+   ```
+3. Verify the Ingress routing rules match the backend service **name** and **port**.
+4. Confirm the service has endpoints (traffic is reaching pods):
+   ```bash
+   kubectl get endpoints backend -n dev
+   ```
+
+</details>
+
+<details>
+<summary><b>Frontend cannot talk to the backend</b></summary>
+
+1. Verify the `VITE_API_BASE_URL` environment variable in the frontend pod.
+2. Check the browser console / network tab for CORS errors or blocked requests.
+3. Ensure the backend service exposes the correct port and the Ingress properly routes `/api` traffic.
+
+</details>
+
+### 🔮 Microservice Evolution
+
+This Ingress-based design can evolve into a larger microservices architecture. By introducing an **API Gateway** (Kong, Ambassador) or a **service mesh** (Istio), the monolithic backend can be split into smaller services (e.g., `auth-service`, `billing-service`) and routed via dedicated Ingress paths such as `/api/auth` and `/api/billing`.
+
+---
+
+## 🚀 Task 4: CI/CD & Multi-Environment Deployment
+
+A GitHub Actions pipeline (`.github/workflows/ci-cd.yml`) automates build and deployment.
+
+### Branch-to-Environment Mapping
+
+| Branch | Target Namespace |
+|---|---|
+| `main` | `dev` |
+| `pre-release/v*` | `preprod` |
+| `release/v*` | `release` |
+
+### 🔐 Secrets Handling
+
+Docker Hub credentials (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) are stored as **GitHub Actions Secrets** and injected at runtime. Long-lived credentials are never committed to the repository.
+
+### ⏪ Rollback Strategy
+
+| Method | Command / Action |
+|---|---|
+| **Fast rollback** | `kubectl rollout undo deployment/backend -n <namespace>` — instantly reverts to the previous ReplicaSet |
+| **CI/CD rollback** | Re-run a previous successful workflow, or revert the Git commit and push so the pipeline redeploys the last stable state |
+
+---
+
+## 🗄 Task 5: Platform Services & DB Read/Write Simulation
+
+### Integrated Services
+
+| Service | Role |
+|---|---|
+| **Redis** | Caching layer |
+| **RabbitMQ** | Message queue for asynchronous tasks |
+| **Elasticsearch** | Search engine indexing |
+
+### Read/Write Database Cluster Simulation
+
+The platform simulates a production DB cluster by exposing separate connection settings:
+
+- `DB_WRITE_URL` → **Primary**
+- `DB_READ_URL` → **Replica**
+
+```mermaid
+flowchart LR
+    APP[Backend App] -->|INSERT / UPDATE / DELETE| W[(Primary DB)]
+    APP -->|SELECT| R[(Read Replica)]
+    W -.replication.-> R
+```
+
+**Where routing logic lives:** in production, read/write routing typically sits at the **application ORM layer** (e.g., Prisma/Sequelize with read replicas) or in a **database proxy** (e.g., PgBouncer, AWS RDS Proxy) that transparently sends `SELECT` queries to replicas and writes to the primary.
+
+**Replication lag implications:** replicas can lag behind the primary. Critical *read-after-write* flows (e.g., a user updates their profile and immediately views it) must be routed to the **primary** to avoid showing stale data.
+
+---
+
+## 📈 Task 6: Observability, Scaling & Rate Limiting
+
+### Scaling & Rate Limiting
+
+| Feature | Configuration |
+|---|---|
+| **Horizontal Pod Autoscaler** | Scales backend between **1 and 5 replicas** when CPU utilization exceeds **70%** |
+| **Rate limiting** | NGINX Ingress annotations limit users to **20 requests/second** and **10 concurrent connections** to mitigate DDoS and API abuse |
+
+### Observability Stack
+
+Prometheus, Grafana, and Fluent Bit manifests live in the `observability/` folder.
+
+### 🚨 Key Alerts
+
+| Alert | Threshold | Why it matters |
+|---|---|---|
+| **High error rate** | HTTP 5xx > 5% for 5 min | Indicates backend crashes, misconfiguration, or DB connection loss |
+| **High CPU / memory** | > 85% for 10 min | Abnormal load, scaling need, or memory leak |
+| **High latency** | API response > 2s | Degraded UX; likely slow queries, missing indexes, or a platform-service bottleneck |
+
+---
+
+## 🖼 Screenshots
+
+> Place all images in the `docs/` folder and update the file names below if needed.
+
+### Architecture Diagram
+
+<p align="center">
+  <img src="docs/architecture.png" alt="Architecture Diagram" width="800"/>
+</p>
+
+### Application UI
+
+<p align="center">
+  <img src="docs/app-ui.png" alt="Application UI" width="800"/>
+</p>
+
+### Kubernetes Cluster State
+
+| Pods & Services | Ingress & HPA |
+|:---:|:---:|
+| <img src="docs/k8s-pods.png" alt="kubectl get pods" width="400"/> | <img src="docs/k8s-ingress-hpa.png" alt="Ingress and HPA" width="400"/> |
+
+### CI/CD Pipeline
+
+<p align="center">
+  <img src="docs/cicd-run.png" alt="Successful GitHub Actions run" width="800"/>
+</p>
+
+### Observability
+
+| Grafana Dashboard | Prometheus Targets |
+|:---:|:---:|
+| <img src="docs/grafana-dashboard.png" alt="Grafana Dashboard" width="400"/> | <img src="docs/prometheus-targets.png" alt="Prometheus Targets" width="400"/> |
+
+---
+
+## ⚖️ Design Decisions & Trade-offs
+
+| Decision | Rationale |
+|---|---|
+| **Docker Hub over GHCR** | Simple public image access for local Kubernetes pulls, without configuring `ImagePullSecrets` |
+| **Raw manifests over Helm** | Simplicity and transparency for this assessment. In a real-world setup, Helm charts would template deployments per environment |
+
+---
+
+## 🔭 Future Improvements
+
+- [ ] Provision cloud infrastructure with **Terraform** (Infrastructure as Code)
+- [ ] Adopt **ArgoCD** for GitOps-based continuous deployment instead of pushing directly from GitHub Actions
+- [ ] Add comprehensive **readiness and liveness probes** for platform services (Redis, RabbitMQ)
+
+---
+
+<div align="center">
+
+Built with ❤️ for the Cloudly DevOps Engineer assessment.
+
+</div>
