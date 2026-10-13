@@ -82,7 +82,6 @@ flowchart LR
     BEP -.logs.-> FB
 ```
 
-> 💡 You can also export this diagram as an image and save it to `docs/architecture.png` (see [Screenshots](#-screenshots)).
 
 ### Request Path
 
