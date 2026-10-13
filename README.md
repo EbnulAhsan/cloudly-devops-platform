@@ -303,37 +303,25 @@ Prometheus, Grafana, and Fluent Bit manifests live in the `observability/` folde
 
 ## 🖼 Screenshots
 
-> Place all images in the `docs/` folder and update the file names below if needed.
-
-### Architecture Diagram
+All screenshots (cluster state, Grafana dashboards, application UI, and successful CI/CD runs) are available in the Google Drive folder below.
 
 <p align="center">
-  <img src="docs/architecture.png" alt="Architecture Diagram" width="800"/>
+  <a href="YOUR_GOOGLE_DRIVE_LINK_HERE">
+    <img src="https://img.shields.io/badge/📂_View_Screenshots-Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="View Screenshots on Google Drive"/>
+  </a>
 </p>
 
-### Application UI
+**Folder contents:**
 
-<p align="center">
-  <img src="docs/app-ui.png" alt="Application UI" width="800"/>
-</p>
+| # | Screenshot | Description |
+|---|---|---|
+| 1 | Architecture Diagram | High-level platform architecture |
+| 2 | Application UI | Running React frontend via Ingress |
+| 3 | Kubernetes Cluster State | Pods, services, ingress, and HPA |
+| 4 | CI/CD Pipeline | Successful GitHub Actions runs |
+| 5 | Observability | Grafana dashboards and Prometheus targets |
 
-### Kubernetes Cluster State
-
-| Pods & Services | Ingress & HPA |
-|:---:|:---:|
-| <img src="docs/k8s-pods.png" alt="kubectl get pods" width="400"/> | <img src="docs/k8s-ingress-hpa.png" alt="Ingress and HPA" width="400"/> |
-
-### CI/CD Pipeline
-
-<p align="center">
-  <img src="docs/cicd-run.png" alt="Successful GitHub Actions run" width="800"/>
-</p>
-
-### Observability
-
-| Grafana Dashboard | Prometheus Targets |
-|:---:|:---:|
-| <img src="docs/grafana-dashboard.png" alt="Grafana Dashboard" width="400"/> | <img src="docs/prometheus-targets.png" alt="Prometheus Targets" width="400"/> |
+> 🔗 Link: [Open Screenshots Folder](YOUR_GOOGLE_DRIVE_LINK_HERE)
 
 ---
 
@@ -356,6 +344,6 @@ Prometheus, Grafana, and Fluent Bit manifests live in the `observability/` folde
 
 <div align="center">
 
-Built with ❤️ for the Cloudly DevOps Engineer assessment.
+Built with ❤️ for the Cloudly DevOps by Ebnul Ahsan.
 
 </div>
